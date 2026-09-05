@@ -18,6 +18,7 @@ const auth = getAuth(app);
 const db = getFirestore(app);
 const keyPrefix = "fly-manager-";
 const maximumSyncedCharacters = 850000;
+const cloudSyncAvailable = location.protocol === "https:" && location.hostname === "lolalovesgenes.github.io";
 let userId = null;
 let applyingCloudChange = false;
 let stopListening = null;
@@ -44,6 +45,10 @@ function syncPanel() {
   style.textContent = `.cloud-sync{display:flex;align-items:center;justify-content:space-between;gap:1rem;margin:1rem 0 1.25rem;padding:1rem 1.1rem;border:1px solid #b8d6c2;border-radius:14px;background:#f5fbf6}.cloud-sync strong{color:#244e35}.cloud-sync p{margin:.25rem 0 0;font-size:.92rem}.cloud-sync button{white-space:nowrap}.cloud-sync-warning{color:#87521b}@media(max-width:600px){.cloud-sync{align-items:flex-start;flex-direction:column}.cloud-sync button{width:100%}}`;
   document.head.append(style);
   document.getElementById("cloud-sync-action").onclick = () => {
+    if (!cloudSyncAvailable) {
+      updatePanel("Cloud sync works on your published Fly Manager website, not when this local file is opened directly.", false, true);
+      return;
+    }
     if (userId) signOut(auth);
     else signInWithRedirect(auth, new GoogleAuthProvider());
   };
@@ -142,12 +147,7 @@ function listenForChanges(uid) {
   });
 }
 
-getRedirectResult(auth).catch(error => {
-  updatePanel("Sign-in did not finish. Please try again.", false, true);
-  console.error("Fly Manager sign-in error", error);
-});
-
-onAuthStateChanged(auth, async user => {
+async function beginCloudSync(user) {
   if (!user) {
     userId = null;
     if (stopListening) stopListening();
@@ -164,6 +164,15 @@ onAuthStateChanged(auth, async user => {
     updatePanel("Sync could not connect. Your records are still saved on this device.", true, true);
     console.error("Fly Manager initial sync error", error);
   }
-});
+}
 
 syncPanel();
+if (cloudSyncAvailable) {
+  getRedirectResult(auth).catch(error => {
+    updatePanel("Sign-in did not finish. Please try again.", false, true);
+    console.error("Fly Manager sign-in error", error);
+  });
+  onAuthStateChanged(auth, beginCloudSync);
+} else {
+  updatePanel("Cloud sync works on your published Fly Manager website. This local copy still saves information on this computer.", false, true);
+}

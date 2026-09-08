@@ -1,7 +1,7 @@
 // Private, free cloud sync for Fly Manager. The public configuration identifies
 // the Firebase project; the Firestore rules protect each signed-in person's data.
 import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.2/firebase-app.js";
-import { browserLocalPersistence, browserSessionPersistence, getAuth, GoogleAuthProvider, getRedirectResult, onAuthStateChanged, setPersistence, signInWithRedirect, signOut } from "https://www.gstatic.com/firebasejs/11.0.2/firebase-auth.js";
+import { browserLocalPersistence, browserSessionPersistence, getAuth, GoogleAuthProvider, onAuthStateChanged, setPersistence, signInWithPopup, signOut } from "https://www.gstatic.com/firebasejs/11.0.2/firebase-auth.js";
 import { collection, deleteDoc, doc, getDocs, getFirestore, onSnapshot, serverTimestamp, setDoc } from "https://www.gstatic.com/firebasejs/11.0.2/firebase-firestore.js";
 
 const firebaseConfig = {
@@ -101,9 +101,9 @@ async function beginGoogleSignIn() {
   setGateMessage("Opening Google sign-in…");
   try {
     await setPersistence(auth, keepSignedIn ? browserLocalPersistence : browserSessionPersistence);
-    await signInWithRedirect(auth, new GoogleAuthProvider());
+    await signInWithPopup(auth, new GoogleAuthProvider());
   } catch (error) {
-    setGateMessage("Sign-in could not start. Please try again.", true);
+    setGateMessage(error.code==="auth/popup-blocked"?"Your browser blocked the Google sign-in window. Allow pop-ups for Fly Manager, then try again.":"Sign-in could not finish. Please try again.", true);
     console.error("Fly Manager sign-in error", error);
   }
 }
@@ -231,10 +231,6 @@ async function handleAuthState(user) {
 
 ensureWelcomeScreen();
 if (cloudSyncAvailable) {
-  getRedirectResult(auth).catch(error => {
-    showWelcomeScreen("Sign-in did not finish. Please try again.", true);
-    console.error("Fly Manager sign-in error", error);
-  });
   onAuthStateChanged(auth, handleAuthState);
 } else {
   hideWelcomeScreen();

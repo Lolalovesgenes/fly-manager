@@ -23,6 +23,7 @@ const localOnlyKeys = new Set([guestModeKey, signInPreferenceKey]);
 const maximumSyncedCharacters = 850000;
 const cloudSyncAvailable = location.protocol === "https:" && location.hostname === "lolalovesgenes.github.io";
 let userId = null;
+let currentUser = null;
 let applyingCloudChange = false;
 let stopListening = null;
 let syncNotice = "";
@@ -60,10 +61,13 @@ function ensureWelcomeScreen() {
   accountButton.id = "account-control";
   accountButton.className = "account-control";
   accountButton.type = "button";
-  accountButton.textContent = "◉";
+  accountButton.textContent = "Account";
   accountButton.setAttribute("aria-label", "Account options");
   accountButton.onclick = accountOptions;
   document.body.append(accountButton);
+  document.body.insertAdjacentHTML("beforeend", `<section id="account-sheet" class="account-sheet hidden" aria-modal="true" role="dialog" aria-label="Account"><div class="account-card"><button id="account-close" class="account-close" type="button" aria-label="Close account options">×</button><p class="eyebrow">FLY MANAGER ACCOUNT</p><h2 id="account-heading">Account</h2><p id="account-status"></p><button id="account-action" type="button"></button></div></section>`);
+  document.getElementById("account-close").onclick=hideAccountSheet;
+  document.head.insertAdjacentHTML("beforeend", `<style>.account-control{width:auto!important;min-width:5.4rem!important;padding:.55rem .75rem!important;border-radius:999px!important;font-size:.82rem!important;font-weight:700}.account-sheet{position:fixed;inset:0;z-index:1001;display:grid;place-items:center;padding:1rem;background:#25213b66}.account-sheet.hidden{display:none}.account-card{position:relative;width:min(100%,360px);padding:1.7rem;border-radius:18px;background:#fff;box-shadow:0 1rem 3rem #1d1a333d;text-align:center}.account-card h2{margin:.2rem 0 .45rem;color:#282544}.account-card #account-status{line-height:1.45;color:#625f76}.account-card button:not(.account-close){width:100%;margin-top:1rem}.account-close{position:absolute;top:.55rem;right:.6rem;min-height:auto!important;padding:.2rem .5rem!important;border:0!important;background:transparent!important;color:#55516b!important;font-size:1.5rem}</style>`);
 }
 
 function setGateMessage(message, error = false) {
@@ -87,7 +91,7 @@ function hideWelcomeScreen() {
 
 function updateAccountControl(message = "Account options") {
   const button = document.getElementById("account-control");
-  if (button) button.title = message;
+  if (button) {button.title = message;button.textContent=currentUser?"Account":isGuest()?"Guest":"Account"}
 }
 
 async function beginGoogleSignIn() {
@@ -98,6 +102,7 @@ async function beginGoogleSignIn() {
   const keepSignedIn = document.getElementById("keep-signed-in").checked;
   localStorage.setItem(signInPreferenceKey, keepSignedIn ? "permanent" : "session");
   localStorage.removeItem(guestModeKey);
+  hideAccountSheet();
   setGateMessage("Opening Google sign-in…");
   try {
     await setPersistence(auth, keepSignedIn ? browserLocalPersistence : browserSessionPersistence);
@@ -111,18 +116,16 @@ async function beginGoogleSignIn() {
 function continueAsGuest() {
   localStorage.setItem(guestModeKey, "true");
   hideWelcomeScreen();
+  hideAccountSheet();
   updateAccountControl("Guest mode — tap to sign in later");
 }
 
+function hideAccountSheet(){document.getElementById("account-sheet")?.classList.add("hidden")}
 function accountOptions() {
-  if (userId) {
-    if (confirm("Sign out of private cloud sync on this device? Your saved cloud data will remain protected.")) signOut(auth);
-    return;
-  }
-  if (isGuest() && confirm("Would you like to sign in with Google and turn on private cloud sync?")) {
-    localStorage.removeItem(guestModeKey);
-    showWelcomeScreen("Sign in with Google to turn on private cloud sync.");
-  }
+  const sheet=document.getElementById("account-sheet"),heading=document.getElementById("account-heading"),status=document.getElementById("account-status"),action=document.getElementById("account-action");
+  sheet.classList.remove("hidden");
+  if(currentUser){heading.textContent=currentUser.displayName||"Signed-in user";status.textContent="You are signed in. Your Fly Manager records are private to this Google account and sync across your signed-in devices.";action.textContent="Log out";action.onclick=async()=>{await signOut(auth);hideAccountSheet()};return}
+  heading.textContent="Guest mode";status.textContent="Guest records stay only on this device. Sign in with Google to give this user private cloud sync.";action.textContent="Sign in with Google";action.onclick=()=>{localStorage.removeItem(guestModeKey);hideAccountSheet();showWelcomeScreen("Sign in with Google to turn on private cloud sync.")}
 }
 
 async function writeKey(key, value) {
@@ -205,6 +208,7 @@ function listenForChanges(uid) {
 async function handleAuthState(user) {
   if (!user) {
     userId = null;
+    currentUser = null;
     if (stopListening) stopListening();
     stopListening = null;
     if (isGuest() || !cloudSyncAvailable) {
@@ -217,6 +221,7 @@ async function handleAuthState(user) {
     return;
   }
   userId = user.uid;
+  currentUser = user;
   localStorage.removeItem(guestModeKey);
   hideWelcomeScreen();
   updateAccountControl("Private cloud sync is on — tap to sign out");

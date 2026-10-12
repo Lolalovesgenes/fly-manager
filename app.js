@@ -20,11 +20,13 @@ const addHours=(value,hours)=>new Date(new Date(value).getTime()+hours*60*60*100
 function workflowEvents(experiment){
   const events=[];
   const isDownshift=experiment.direction==="25to18";
-  const shiftDays=isDownshift?[2,4,6,8]:[3,6,9,12];
+  const shiftDays=isDownshift?[2,4,5,6,7,7.5,8,9]:[3,6,9,11,12,13,15,18];
   const targetTemperature=isDownshift?18:25;
   for(let number=1;number<=3;number++){
     const start=addHours(experiment.start,(number-1)*24);
-    events.push({time:start,replicate:number,kind:"Setup",text:number===1?"Day 0 setup: make new vials for virgin collection.":"Make a new Replicate: make the next virgin-collection vial.",reminder:number===1?"":"Make a new Replicate"});
+    events.push({time:start,replicate:number,kind:"Setup",text:number===1?"Day 0 setup: make new vials for virgin collection and begin a 6-hour mating window.":"Make a new Replicate: make the next virgin-collection vial and begin a 6-hour mating window.",reminder:number===1?"":"Make a new Replicate"});
+    events.push({time:addHours(start,6),replicate:number,kind:"6-hour mating",text:"Finish the 6-hour mating window for this temperature-shift vial; remove or transfer adults according to your protocol.",reminder:"Finish 6-hour mating window"});
+    events.push({time:start,replicate:number,kind:"Control vial",text:`Set aside the final control vial and keep it at ${isDownshift?25:18}°C for its entire life; do not temperature-shift this vial.`,reminder:"Label unshifted control vial"});
     if(number===1){
       events.push({time:addHours(start,7*24),replicate:"Virgin set",kind:"Day 7",text:"Plug the shared virgin-collection vial.",reminder:"Plug virgin vial"});
       events.push({time:addHours(start,12*24),replicate:"Virgin set",kind:"Day 12",text:"Start collecting virgin flies from the shared virgin set.",reminder:"Start collecting virgin flies"});
@@ -37,8 +39,9 @@ function workflowEvents(experiment){
       const chain=`rep${number}-shift${day}`;
       events.push({time:maleTime,replicate:number,chain,task:"male-collection",kind:`Day ${maleCollectionDay}`,text:day===shiftDays[0]?`Start collecting males for the Day ${day} shift.`:`Collect males for the Day ${day} shift.`,reminder:day===shiftDays[0]?"Start collecting males":"Collect males"});
       events.push({time:maleTime,replicate:number,chain,task:"aging-start",kind:"Aging",text:"Start aging the collected flies for the fertility assay.",reminder:"Start aging flies"});
-      events.push({time:addHours(maleTime,3*24),replicate:number,chain,task:"fertility-setup",kind:"Fertility assay",text:"Set up the fertility assay.",reminder:"Set up fertility assay"});
-      events.push({time:addHours(maleTime,4*24),replicate:number,chain,task:"discard-males",kind:"Fertility assay",text:"Discard the male flies from the vial.",reminder:"Discard male flies"});
+      events.push({time:addHours(maleTime,3*24),replicate:number,chain,task:"fertility-setup",kind:"Fertility assay",text:"Set up the fertility assay; allow males to mate with females for 3–5 days.",reminder:"Set up fertility assay"});
+      events.push({time:addHours(maleTime,6*24),replicate:number,chain,task:"fertility-mating-minimum",kind:"Fertility assay",text:"Males have now mated for 3 days. You may discard them now, or continue mating through Day 5.",reminder:"3-day fertility mating point"});
+      events.push({time:addHours(maleTime,8*24),replicate:number,chain,task:"discard-males",kind:"Fertility assay",text:"Final day of the 3–5 day fertility mating window: discard the males from the vial.",reminder:"Discard male flies"});
       events.push({time:addHours(maleTime,10*24),replicate:number,chain,task:"plug-assay",kind:"Fertility assay",text:"Plug the fertility-assay vial.",reminder:"Plug fertility-assay vial"});
       events.push({time:addHours(maleTime,17*24),replicate:number,chain,task:"fly-count",kind:"Fly count",text:"Start counting flies.",reminder:"Start counting flies"});
     }

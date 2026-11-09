@@ -49,25 +49,30 @@ function ensureWelcomeScreen() {
         <label class="stay-signed-in"><input id="keep-signed-in" type="checkbox" checked> Keep me signed in on this device</label>
         <button id="google-sign-in" type="button">Sign in with Google</button>
         <button id="guest-sign-in" class="secondary" type="button">Continue as guest</button>
-        <p id="sign-in-message" class="hint">Guest mode saves your work only on this device. You can sign in later from the account icon.</p>
+        <p id="sign-in-message" class="hint">Guest mode saves your work only on this device. You can sign in later from the home-page account widget.</p>
       </div>
     </section>`);
   const style = document.createElement("style");
-  style.textContent = `.sign-in-gate{position:fixed;inset:0;z-index:1000;display:grid;place-items:center;padding:1rem;background:linear-gradient(145deg,#e6f3eb,#e6ebf8);overflow:auto}.sign-in-gate.hidden{display:none}.sign-in-card{width:min(100%,430px);padding:2rem;border:1px solid #d7ddea;border-radius:22px;background:#fff;box-shadow:0 1.2rem 3.5rem #2d315033;text-align:center}.sign-in-fly{font-size:2.6rem}.eyebrow{margin:.5rem 0;color:#646180;font-size:.72rem;font-weight:800;letter-spacing:.12em}.sign-in-card h1{margin:.2rem 0 .55rem;color:#282544;font-size:1.65rem}.sign-in-card>p:not(.hint){line-height:1.5;color:#626073}.stay-signed-in{display:flex;align-items:center;justify-content:center;gap:.5rem;margin:1.35rem 0 .8rem;font-size:.92rem}.stay-signed-in input{width:auto}.sign-in-card button{display:block;width:100%;margin:.65rem 0}.sign-in-card .hint{margin:.9rem 0 0;font-size:.82rem;line-height:1.4}.sign-in-error{color:#8a3f25}.account-control{position:fixed;right:.9rem;top:.8rem;z-index:30;width:2.5rem;min-height:2.5rem;padding:0;border:0;border-radius:50%;display:grid;place-items:center;background:#fff;color:#403b68;box-shadow:0 .2rem .7rem #29255222;font-size:1.15rem}@media(max-width:500px){.sign-in-card{padding:1.55rem 1.25rem}}`;
+  style.textContent = `.sign-in-gate{position:fixed;inset:0;z-index:1000;display:grid;place-items:center;padding:1rem;background:linear-gradient(145deg,#e6f3eb,#e6ebf8);overflow:auto}.sign-in-gate.hidden{display:none}.sign-in-card{width:min(100%,430px);padding:2rem;border:1px solid #d7ddea;border-radius:22px;background:#fff;box-shadow:0 1.2rem 3.5rem #2d315033;text-align:center}.sign-in-fly{font-size:2.6rem}.eyebrow{margin:.5rem 0;color:#646180;font-size:.72rem;font-weight:800;letter-spacing:.12em}.sign-in-card h1{margin:.2rem 0 .55rem;color:#282544;font-size:1.65rem}.sign-in-card>p:not(.hint){line-height:1.5;color:#626073}.stay-signed-in{display:flex;align-items:center;justify-content:center;gap:.5rem;margin:1.35rem 0 .8rem;font-size:.92rem}.stay-signed-in input{width:auto}.sign-in-card button{display:block;width:100%;margin:.65rem 0}.sign-in-card .hint{margin:.9rem 0 0;font-size:.82rem;line-height:1.4}.sign-in-error{color:#8a3f25}@media(max-width:500px){.sign-in-card{padding:1.55rem 1.25rem}}`;
   document.head.append(style);
   document.getElementById("google-sign-in").onclick = beginGoogleSignIn;
   document.getElementById("guest-sign-in").onclick = continueAsGuest;
-  const accountButton = document.createElement("button");
-  accountButton.id = "account-control";
-  accountButton.className = "account-control";
-  accountButton.type = "button";
-  accountButton.textContent = "Account";
-  accountButton.setAttribute("aria-label", "Account options");
-  accountButton.onclick = accountOptions;
-  document.body.append(accountButton);
-  document.body.insertAdjacentHTML("beforeend", `<section id="account-sheet" class="account-sheet hidden" aria-modal="true" role="dialog" aria-label="Account"><div class="account-card"><button id="account-close" class="account-close" type="button" aria-label="Close account options">×</button><p class="eyebrow">FLY MANAGER ACCOUNT</p><h2 id="account-heading">Account</h2><p id="account-status"></p><button id="account-action" type="button"></button></div></section>`);
+  ensureAccountWidget();
+  document.body.insertAdjacentHTML("beforeend", `<section id="account-sheet" class="account-sheet hidden" aria-modal="true" role="dialog" aria-label="Sign-in options"><div class="account-card"><button id="account-close" class="account-close" type="button" aria-label="Close account options">×</button><p class="eyebrow">FLY MANAGER</p><h2 id="account-heading">Sign in</h2><p id="account-status"></p><button id="account-action" type="button"></button><button id="account-sign-out" class="secondary hidden" type="button">Log out</button></div></section>`);
   document.getElementById("account-close").onclick=hideAccountSheet;
-  document.head.insertAdjacentHTML("beforeend", `<style>.account-control{width:auto!important;min-width:5.4rem!important;padding:.55rem .75rem!important;border-radius:999px!important;font-size:.82rem!important;font-weight:700}.account-sheet{position:fixed;inset:0;z-index:1001;display:grid;place-items:center;padding:1rem;background:#25213b66}.account-sheet.hidden{display:none}.account-card{position:relative;width:min(100%,360px);padding:1.7rem;border-radius:18px;background:#fff;box-shadow:0 1rem 3rem #1d1a333d;text-align:center}.account-card h2{margin:.2rem 0 .45rem;color:#282544}.account-card #account-status{line-height:1.45;color:#625f76}.account-card button:not(.account-close){width:100%;margin-top:1rem}.account-close{position:absolute;top:.55rem;right:.6rem;min-height:auto!important;padding:.2rem .5rem!important;border:0!important;background:transparent!important;color:#55516b!important;font-size:1.5rem}</style>`);
+  document.head.insertAdjacentHTML("beforeend", `<style>.account-widget{display:flex;align-items:center;justify-content:space-between;gap:1rem;margin:0 0 1.1rem;padding:.85rem 1rem;border:1px solid #d4bd55;border-radius:13px;background:#fffdf4}.account-widget p{margin:.15rem 0 0;color:#58647c;font-size:.86rem}.account-widget strong{color:#142b59}.account-widget button{white-space:nowrap}.account-sheet{position:fixed;inset:0;z-index:1001;display:grid;place-items:center;padding:1rem;background:#25213b66}.account-sheet.hidden{display:none}.account-card{position:relative;width:min(100%,360px);padding:1.7rem;border-radius:18px;background:#fff;box-shadow:0 1rem 3rem #1d1a333d;text-align:center}.account-card h2{margin:.2rem 0 .45rem;color:#282544}.account-card #account-status{line-height:1.45;color:#625f76}.account-card button:not(.account-close){width:100%;margin-top:1rem}.account-close{position:absolute;top:.55rem;right:.6rem;min-height:auto!important;padding:.2rem .5rem!important;border:0!important;background:transparent!important;color:#55516b!important;font-size:1.5rem}@media(max-width:550px){.account-widget{align-items:flex-start;flex-direction:column}.account-widget button{width:100%}}</style>`);
+}
+
+function ensureAccountWidget() {
+  if (document.getElementById("account-widget")) return;
+  const home = document.getElementById("home-page");
+  if (!home) return;
+  const widget = document.createElement("section");
+  widget.id = "account-widget";
+  widget.className = "account-widget";
+  widget.innerHTML = `<div><strong id="account-widget-title">Sign in</strong><p id="account-widget-status">Sign in to keep records available on all your devices.</p></div><button id="account-widget-button" class="secondary" type="button">Sign in</button>`;
+  home.querySelector(".intro")?.insertAdjacentElement("afterend", widget);
+  document.getElementById("account-widget-button").onclick = accountOptions;
 }
 
 function setGateMessage(message, error = false) {
@@ -78,7 +83,7 @@ function setGateMessage(message, error = false) {
   }
 }
 
-function showWelcomeScreen(message = "Guest mode saves your work only on this device. You can sign in later from the account icon.", error = false) {
+function showWelcomeScreen(message = "Guest mode saves your work only on this device. You can sign in later from the home-page account widget.", error = false) {
   ensureWelcomeScreen();
   document.getElementById("sign-in-gate").classList.remove("hidden");
   setGateMessage(message, error);
@@ -90,8 +95,15 @@ function hideWelcomeScreen() {
 }
 
 function updateAccountControl(message = "Account options") {
-  const button = document.getElementById("account-control");
-  if (button) {button.title = message;button.textContent=currentUser?"Account":isGuest()?"Guest":"Account"}
+  ensureAccountWidget();
+  const button = document.getElementById("account-widget-button");
+  const title = document.getElementById("account-widget-title");
+  const status = document.getElementById("account-widget-status");
+  if (!button || !title || !status) return;
+  button.title = message;
+  if (currentUser) {title.textContent = currentUser.displayName || "Signed in";status.textContent = message;button.textContent = "Switch account";return}
+  if (isGuest()) {title.textContent = "Using this device as a guest";status.textContent = "Guest records stay only on this device.";button.textContent = "Sign in or switch account";return}
+  title.textContent = "Sign in";status.textContent = message;button.textContent = "Sign in";
 }
 
 async function beginGoogleSignIn() {
@@ -122,10 +134,10 @@ function continueAsGuest() {
 
 function hideAccountSheet(){document.getElementById("account-sheet")?.classList.add("hidden")}
 function accountOptions() {
-  const sheet=document.getElementById("account-sheet"),heading=document.getElementById("account-heading"),status=document.getElementById("account-status"),action=document.getElementById("account-action");
+  const sheet=document.getElementById("account-sheet"),heading=document.getElementById("account-heading"),status=document.getElementById("account-status"),action=document.getElementById("account-action"),signOutButton=document.getElementById("account-sign-out");
   sheet.classList.remove("hidden");
-  if(currentUser){heading.textContent=currentUser.displayName||"Signed-in user";status.textContent="You are signed in. Your Fly Manager records are private to this Google account and sync across your signed-in devices.";action.textContent="Log out";action.onclick=async()=>{await signOut(auth);hideAccountSheet()};return}
-  heading.textContent="Guest mode";status.textContent="Guest records stay only on this device. Sign in with Google to give this user private cloud sync.";action.textContent="Sign in with Google";action.onclick=()=>{localStorage.removeItem(guestModeKey);hideAccountSheet();showWelcomeScreen("Sign in with Google to turn on private cloud sync.")}
+  if(currentUser){heading.textContent=currentUser.displayName||"Signed-in user";status.textContent="Your Fly Manager records are private to this Google account and sync across your signed-in devices.";action.textContent="Switch Google account";action.onclick=async()=>{await signOut(auth);hideAccountSheet();showWelcomeScreen("Choose the Google account you want to use for Fly Manager.")};signOutButton.classList.remove("hidden");signOutButton.onclick=async()=>{await signOut(auth);hideAccountSheet()};return}
+  signOutButton.classList.add("hidden");heading.textContent=isGuest()?"Guest mode":"Sign in";status.textContent=isGuest()?"Guest records stay only on this device. Sign in with Google to give this user private cloud sync.":"Sign in with Google to keep your records private and available on your devices.";action.textContent="Sign in with Google";action.onclick=()=>{localStorage.removeItem(guestModeKey);hideAccountSheet();showWelcomeScreen("Sign in with Google to turn on private cloud sync.")}
 }
 
 async function writeKey(key, value) {

@@ -683,3 +683,64 @@ setTimeout(()=>{
     workflowCurrent={id:crypto.randomUUID(),genotype,start,direction:activeWorkflowDirection,genotypeCount:count,genotypePrefixes:prefixes,vialPrefix:prefixes[0]};$("workflow-validation").innerHTML="";$("workflow-barcode-section").classList.add("hidden");showWorkflow(workflowCurrent);
   };
 },0);
+
+// The temperature shift and the fertility assay are intentionally separate.
+// Fly emergence varies, so the assay is planned from its real setup time,
+// using an index number rather than an expected male-collection date.
+const fertilityScheduleKey="fly-manager-fertility-schedules-v1";
+let fertilityScheduleCurrent;
+function fertilitySchedules(){try{return JSON.parse(localStorage.getItem(fertilityScheduleKey))||[]}catch{return[]}}
+function saveFertilitySchedules(records){localStorage.setItem(fertilityScheduleKey,JSON.stringify(records))}
+function fertilityScheduleEvents(record){
+  const setup=new Date(record.setup),matingDays=Number(record.matingDays)||3,index=record.index;
+  return [
+    {time:setup,kind:"Fertility assay setup",text:`${index}: set up the fertility-assay vial with three females and the collected males.`},
+    {time:addHours(setup,matingDays*24),kind:"Remove males",text:`${index}: the ${matingDays}-day mating period is complete. Remove the males from the vial.`},
+    {time:addHours(setup,7*24),kind:"Plug vial",text:`${index}: plug the fertility-assay vial.`},
+    {time:addHours(setup,14*24),kind:"Fly count",text:`${index}: begin counting flies. Flies may start emerging around this time.`}
+  ];
+}
+function fertilityScheduleMarkup(record){return fertilityScheduleEvents(record).map(event=>`<article class="day"><b>${formatTime(event.time)}</b><div class="task"><strong>${event.kind}</strong><br>${event.text}</div></article>`).join("")}
+function fertilityTaskItems(forCalendar=false){
+  const now=new Date(),today=dateValue(now),items=[];
+  fertilitySchedules().forEach(record=>fertilityScheduleEvents(record).forEach((event,index)=>{
+    if((forCalendar&&event.time>=now)||(!forCalendar&&dateValue(event.time)===today))items.push({id:`fertility:${record.id}:${index}:${event.time.toISOString()}`,source:"Fertility assay",title:`${record.index}: ${event.kind}`,time:event.time});
+  }));
+  return items;
+}
+function renderFertilitySchedules(){
+  const box=$("fertility-schedule-saved");if(!box)return;
+  const records=fertilitySchedules();
+  box.innerHTML=records.length?records.map(record=>`<div class="saved-card"><div><h3>${escapeText(record.index)}</h3><p>Fertility assay set up: ${formatTime(record.setup)} · ${record.matingDays}-day mating period</p></div><button class="secondary" type="button" data-open-fertility-schedule="${record.id}">Open</button></div>`).join(""):`<p class="hint">No fertility-assay schedules saved yet.</p>`;
+  box.querySelectorAll("[data-open-fertility-schedule]").forEach(button=>button.onclick=()=>{fertilityScheduleCurrent=fertilitySchedules().find(record=>record.id===button.dataset.openFertilitySchedule);if(!fertilityScheduleCurrent)return;$("fertility-index").value=fertilityScheduleCurrent.index;$("fertility-setup").value=fertilityScheduleCurrent.setup;$("fertility-mating-days").value=fertilityScheduleCurrent.matingDays;$("fertility-schedule-title").textContent=`${fertilityScheduleCurrent.index} — Fertility assay schedule`;$("fertility-schedule-list").innerHTML=fertilityScheduleMarkup(fertilityScheduleCurrent);$("fertility-schedule-result").classList.remove("hidden");$("fertility-save").classList.add("hidden")});
+}
+function ensureFertilityScheduleGenerator(){
+  if($("fertility-schedule-page"))return;
+  const homeGrid=$("home-page").querySelector(".menu-grid"),card=document.createElement("button");
+  card.className="menu-card fertility-generator-card";card.type="button";card.innerHTML="<b>🧫<br>Fertility &amp; Count</b><span>Plan the fertility assay from its actual setup time and vial index.</span>";homeGrid.insertBefore(card,homeGrid.children[1]||null);card.onclick=()=>{renderFertilitySchedules();page("fertility-schedule-page")};
+  document.querySelector("main").insertAdjacentHTML("beforeend",`<section id="fertility-schedule-page" class="page hidden"><button class="secondary back" type="button" id="fertility-schedule-back">← Home</button><div class="intro"><h2>Fertility Assay &amp; Fly Count Generator</h2><p>Use the actual fertility-assay setup time, not the temperature-shift date. This schedule is identified only by the vial/index number.</p></div><section class="panel"><form id="fertility-schedule-form"><div class="form-grid"><label>Vial or assay index number<input id="fertility-index" required placeholder="e.g., MT18253-01"></label><label>Fertility-assay setup date and time<input id="fertility-setup" type="datetime-local" required></label><label>Mating period<select id="fertility-mating-days"><option value="2">2 days</option><option value="3" selected>3 days</option></select></label></div><button>Generate fertility schedule</button></form><p id="fertility-schedule-message" class="hint" aria-live="polite"></p></section><section id="fertility-schedule-result" class="panel hidden"><div class="heading"><div><h2 id="fertility-schedule-title">Fertility assay schedule</h2><p class="hint">Counting begins 14 days after fertility-assay setup.</p></div><button id="fertility-save" type="button">Save schedule</button></div><div id="fertility-schedule-list"></div></section><section class="panel"><h2>Saved fertility schedules</h2><div id="fertility-schedule-saved"></div></section></section>`);
+  $("fertility-schedule-back").onclick=()=>page("home-page");
+  $("fertility-schedule-form").onsubmit=event=>{event.preventDefault();const index=$("fertility-index").value.trim().toUpperCase(),setup=$("fertility-setup").value,matingDays=Number($("fertility-mating-days").value);if(!index||!setup){$("fertility-schedule-message").textContent="Enter the index number and the actual fertility-assay setup time.";return}fertilityScheduleCurrent={id:crypto.randomUUID(),index,setup,matingDays};$("fertility-schedule-title").textContent=`${index} — Fertility assay schedule`;$("fertility-schedule-list").innerHTML=fertilityScheduleMarkup(fertilityScheduleCurrent);$("fertility-schedule-message").textContent="";$("fertility-save").classList.remove("hidden");$("fertility-schedule-result").classList.remove("hidden")};
+  $("fertility-save").onclick=()=>{if(!fertilityScheduleCurrent)return;const records=fertilitySchedules(),position=records.findIndex(record=>record.id===fertilityScheduleCurrent.id);if(position<0)records.unshift(fertilityScheduleCurrent);else records[position]=fertilityScheduleCurrent;saveFertilitySchedules(records);$("fertility-save").classList.add("hidden");$("fertility-schedule-message").textContent="Fertility schedule saved.";renderFertilitySchedules();renderTasks();renderWeeklySchedule()};
+  document.head.insertAdjacentHTML("beforeend",`<style>#fertility-schedule-page{background:#e9f5f3}.fertility-generator-card{border-left:5px solid #0699a7!important}.fertility-generator-card b{color:#075f68}</style>`);
+}
+function shiftOnlyWorkflowEvents(experiment){
+  const downshift=experiment.direction==="25to18",days=taoShiftDays[downshift?"25to18":"18to25"],first=downshift?25:18,target=downshift?18:25,start=new Date(experiment.start),genotypes=concurrentGenotypeText(experiment),events=[];
+  events.push({time:start,replicate:1,kind:"Egg collection setup",task:"egg-collection",text:`At 25°C, set up egg-collection parents for ${genotypes.text}. Leave them for exactly 24 hours.`,reminder:"Set up 25°C egg collection"});
+  [1,2,3].forEach(replicate=>{const eggTime=addHours(start,replicate*24),next=replicate<3?` Transfer the parents into a fresh 25°C vial to begin Replicate ${replicate+1}.`:" No further parent transfer is needed.";events.push({time:eggTime,replicate:1,chain:`R${replicate}-egg`,kind:`Replicate ${replicate} egg collection`,vialId:`R${replicate}`,text:`Collect 24-hour eggs for Replicate ${replicate} from ${genotypes.text}; move the eggs into the first temperature (${first}°C).${next}`,reminder:`Start Replicate ${replicate} at ${first}°C`});days.forEach(day=>{const vialIds=concurrentVialIds(experiment,day,replicate,genotypes),vialText=vialIds.join(", ");events.push({time:addHours(eggTime,day*24),replicate:1,chain:`R${replicate}-shift-${String(day).replace(".","-")}`,task:"temperature-shift",kind:`Day ${day} temperature shift`,vialId:vialText,vialIds,text:`${vialText}: shift these genotype-specific ${replicate===1?"primary":"backup"} vials from ${first}°C to ${target}°C at the same time.`,reminder:`Day ${day} shift — Replicate ${replicate}`})})});
+  events.forEach(event=>{const replacement=event.task&&experiment.overrides?.[`${event.chain}:${event.task}`];if(replacement){event.time=new Date(replacement);event.modified=true}});
+  return events.sort((a,b)=>a.time-b.time);
+}
+setTimeout(()=>{
+  workflowEvents=shiftOnlyWorkflowEvents;
+  const setDirectionBeforeShiftOnly=setWorkflowDirection;setWorkflowDirection=function(direction){setDirectionBeforeShiftOnly(direction);$("workflow-page-heading").textContent=`${direction==="25to18"?"25°C → 18°C":"18°C → 25°C"} temperature-shift schedule`};
+  const shiftOnlyChart=referenceGantt;referenceGantt=function(record,events){return shiftOnlyChart(record,events).replace(/Phases 1–3 \([^)]*\)/,"Temperature-shift phase").replace(/<div class="reference-legend">[\s\S]*?<\/div>/,`<div class="reference-legend"><span><i style="background:${referenceChartPalette.preparation}"></i>Preparation</span><span><i style="background:${referenceChartPalette.shift}"></i>Temperature shift</span></div>`)};
+  const shiftOnlyPrintChart=printableReferenceGantt;printableReferenceGantt=function(record,events){return shiftOnlyPrintChart(record,events).replace(/<div class="reference-legend">[\s\S]*?<\/div>/,`<div class="reference-legend"><span><i style="background:${referenceChartPalette.preparation}"></i>Preparation</span><span><i style="background:${referenceChartPalette.shift}"></i>Temperature shift</span></div>`)};
+  $("home-page").querySelector('[data-page="schedule-generator-page"] span').textContent="Create and save a temperature-shift schedule only.";
+  $("workflow-page-heading").textContent="Temperature-shift schedule";
+  $("workflow-18-page").querySelector(".intro p").textContent="This schedule ends after the temperature-shift phase. Set up fertility assays separately when flies actually emerge.";
+  ensureFertilityScheduleGenerator();
+  modifierEvents=record=>workflowEvents(record).filter(event=>event.task==="temperature-shift");
+  const allTasksBeforeFertilitySchedules=allTasks;allTasks=forCalendar=>[...allTasksBeforeFertilitySchedules(forCalendar),...fertilityTaskItems(forCalendar)];
+  renderTasks();renderWeeklySchedule();
+},0);

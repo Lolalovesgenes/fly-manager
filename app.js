@@ -801,3 +801,44 @@ function setUpExperimentsHub(){
   $("open-fertility-from-experiments").onclick=()=>{renderFertilitySchedules();page("fertility-schedule-page")};
 }
 setTimeout(()=>{setUpCombinedTasks();setUpExperimentsHub();setUpSimplifiedHome()},0);
+
+// Weekly printout and noon-only temperature shifts.
+setTimeout(()=>{
+  const originalWorkflowEvents=workflowEvents;
+  workflowEvents=function(record){
+    const events=originalWorkflowEvents(record);
+    events.forEach(event=>{
+      if(event.task!=="temperature-shift")return;
+      event.time=new Date(event.time);event.time.setHours(12,0,0,0);
+      event.vialId=String(event.vialId||"").replace(/-R([1-3])/g,"-0$1");
+      event.vialIds=(event.vialIds||[]).map(id=>String(id).replace(/-R([1-3])/g,"-0$1"));
+      const from=record.direction==="25to18"?25:18,to=record.direction==="25to18"?18:25;
+      event.text=`${event.vialId}: move from ${from}°C to ${to}°C between 12:00 and 12:30 PM.`;
+      event.reminder=`${event.kind} — 12:00–12:30 PM`;
+    });
+    return events.sort((a,b)=>new Date(a.time)-new Date(b.time));
+  };
+  const originalGantt=shiftGanttMarkup;
+  shiftGanttMarkup=record=>originalGantt(record).replace(/-R([1-3])/g,"-0$1").replace("-R# = replicate.","-01, -02, or -03 = vial/replicate.").replace("Temperature-shift schedule only.","All temperature shifts are completed between 12:00 and 12:30 PM. Monitor vials daily for first male emergence. Temperature-shift schedule only.");
+  showWorkflowGantt=record=>$("workflow-gantt").innerHTML=shiftGanttMarkup(record);
+  taoScheduleGantt=record=>shiftGanttMarkup(record);
+  printableReferenceGantt=record=>shiftGanttMarkup(record);
+
+  const originalWeeklyMarkup=weeklyScheduleMarkup;
+  weeklyScheduleMarkup=function(compact=false){
+    const note='<aside class="weekly-monitor-note"><strong>Daily monitoring:</strong> Monitor every active temperature-shift vial for the first male emergence.</aside>';
+    const button=compact?"":'<button id="weekly-print-schedule" class="secondary weekly-print-button" type="button">Print / Save weekly schedule as PDF</button>';
+    return originalWeeklyMarkup(compact).replace("</header>",`</header>${note}`).replace(/<\/div>$/ ,`${button}</div>`);
+  };
+  document.addEventListener("click",event=>{if(event.target.closest("#weekly-print-schedule")){event.preventDefault();printWeeklySchedule()}});
+  document.head.insertAdjacentHTML("beforeend",'<style>.weekly-monitor-note{margin:.75rem 0;padding:.7rem .8rem;background:#fff8d7;border-left:4px solid #d4bd55;color:#4c4215;font-size:.86rem}.weekly-print-button{margin-top:.9rem}</style>');
+  renderTasks();renderWeeklySchedule();
+},0);
+
+function printWeeklySchedule(){
+  const start=weeklyScheduleStart(),end=addHours(start,7*24),range=`${start.toLocaleDateString(undefined,{month:"short",day:"numeric",year:"numeric"})} – ${addHours(end,-24).toLocaleDateString(undefined,{month:"short",day:"numeric",year:"numeric"})}`,tasks=weeklyScheduleTasks(),days=Array.from({length:7},(_,i)=>addHours(start,i*24));
+  const content=days.map(day=>{const next=addHours(day,24),items=tasks.filter(task=>{const time=new Date(task.time||`${task.date}T00:00:00`);return time>=day&&time<next}),label=day.toLocaleDateString(undefined,{weekday:"long",month:"short",day:"numeric"});return `<section><h2>${label}</h2><p class="daily"><strong>Daily:</strong> Monitor temperature-shift vials for first male emergence.</p>${items.length?`<table><thead><tr><th>Time</th><th>Task</th><th>Source</th></tr></thead><tbody>${items.map(task=>`<tr><td>${new Date(task.time).toLocaleTimeString([],{hour:"numeric",minute:"2-digit"})}</td><td>${escapeText(task.title)}</td><td>${escapeText(task.source)}</td></tr>`).join("")}</tbody></table>`:'<p class="empty">No planned tasks.</p>'}</section>`}).join("");
+  const popup=window.open("","_blank");if(!popup)return;
+  popup.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>Weekly schedule</title><style>@page{size:A4 portrait;margin:11mm}*{box-sizing:border-box}body{font:10pt/1.35 Arial,sans-serif;color:#172033;margin:0}header{border-bottom:3px solid #d4bd55;padding-bottom:3mm;margin-bottom:4mm}h1{margin:0;color:#142b59;font-size:18pt}header p{margin:1.5mm 0 0;color:#52617a}section{break-inside:avoid;margin-bottom:5mm}h2{font-size:11pt;margin:0;background:#142b59;color:#fff;padding:2mm 3mm}.daily{margin:1.5mm 0;padding:1.5mm 2mm;background:#fff8d7;border-left:3px solid #d4bd55;font-size:8.5pt}table{width:100%;border-collapse:collapse;table-layout:fixed}th,td{border:1px solid #cbd3df;padding:2mm;text-align:left;vertical-align:top}th{background:#edf2f8;color:#142b59;font-size:8.5pt}th:first-child,td:first-child{width:20%}th:last-child,td:last-child{width:18%}.empty{margin:0;border:1px solid #d9e0ea;padding:2mm 3mm;color:#596a83}</style></head><body><header><h1>Fly Manager — Weekly Schedule</h1><p>${escapeText(range)} · Complete every temperature shift between 12:00 and 12:30 PM.</p></header>${content}</body></html>`);
+  popup.document.close();popup.focus();setTimeout(()=>popup.print(),350);
+}
